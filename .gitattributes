@@ -1,0 +1,5 @@
+# Normalize line endings across Windows and Mac so Git doesn't treat
+# line-ending differences as real code changes. Git stores text files
+# in the shared repo using LF, and converts them to each person's
+# native format (CRLF on Windows, LF on Mac) when checked out locally.
+* text=auto
