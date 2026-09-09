@@ -10,7 +10,7 @@ export const draftTripShape = {
   tripType: 'oneWay|roundTrip',
   startTime: 'ISO8601',
   leaveNow: true,
-  vehicle: { year: 0, make: '', model: '', fuelType: '', cityMPG: 0, highwayMPG: 0, tankCapacityGallons: 0, fuelRemainingGallons: 0, isEV: false } | null,
+  vehicle: { year: 0, make: '', model: '', fuelType: '', cityMPG: 0, highwayMPG: 0, tankCapacityGallons: 0, fuelRemainingGallons: 0, isEV: false, batteryRangeMiles: 0, currentChargePercent: 0 } | null,
   preferences: { routePreference: '', mealType: '', diet: '', priceRange: '', petFriendly: false, budgetTotal: null, tripTemplate: null },
   userType: 'passenger|trucker',
   measurementSystem: 'us|metric'

@@ -69,9 +69,11 @@ function normalizeUserType(value, draft) {
   return 'Passenger / Road tripper';
 }
 
-function normalizeFuelType(value) {
-  if (typeof value !== 'string') return 'Regular';
-  return FUEL_TYPE_SWIFT[value] ?? FUEL_TYPE_SWIFT[value.toLowerCase()] ?? 'Regular';
+function normalizeFuelType(value, isEV) {
+  // An EV with no fuelType given should default to "Electric", not "Regular".
+  const fallback = isEV ? 'Electric' : 'Regular';
+  if (typeof value !== 'string') return fallback;
+  return FUEL_TYPE_SWIFT[value] ?? FUEL_TYPE_SWIFT[value.toLowerCase()] ?? fallback;
 }
 
 const SWIFT_STOP_TYPES = new Set(['restArea', 'gas', 'meal', 'hotel', 'funActivity', 'charging']);
@@ -87,7 +89,7 @@ function normalizeVehicle(v) {
   if (!v || typeof v !== 'object') return null;
   return {
     ...v,
-    fuelType: normalizeFuelType(v.fuelType),
+    fuelType: normalizeFuelType(v.fuelType, v.isEV === true),
   };
 }
 
