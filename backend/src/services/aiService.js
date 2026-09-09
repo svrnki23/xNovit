@@ -6,6 +6,7 @@
 import OpenAI from 'openai';
 import { normalizeTripForSwift } from '../lib/iosTripCodec.js';
 import { newUuid, stopPayload, weatherSegmentPayload } from '../lib/schemas.js';
+import { calculateGasStops } from '../lib/gasCalculator.js';
 
 const openai = process.env.OPENAI_API_KEY
   ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
@@ -34,7 +35,45 @@ export async function calculateTripWithAI(draft) {
     }
   }
   if (!trip) trip = buildFallbackTrip(draft, startTime, originName, destName, userType, prefs, vehicle);
+
+  // Gas stops always come from real math, never from AI or hardcoded data —
+  // regardless of which path built the rest of the trip above.
+  trip.gasStops = buildGasStops(vehicle, trip.route, startTime);
+
   return normalizeTripForSwift(trip, draft);
+}
+
+/**
+ * Turn the calculator's mile markers into real stop objects the app can display.
+ * Station names are placeholders ("Gas stop (mile X)") until real Places/Mapbox
+ * data is wired in — we don't invent fake station names anymore.
+ */
+function buildGasStops(vehicle, route, startTime) {
+  const stopMiles = calculateGasStops({
+    tankCapacityGallons: vehicle?.tankCapacityGallons,
+    fuelRemainingGallons: vehicle?.fuelRemainingGallons,
+    highwayMPG: vehicle?.highwayMPG,
+    totalDistanceMiles: route?.distanceMiles,
+  });
+
+  // Rough average speed for this trip, used only to estimate an ETA for each stop.
+  const milesPerMinute = route?.distanceMiles && route?.durationMinutes
+    ? route.distanceMiles / route.durationMinutes
+    : null;
+
+  return stopMiles.map((mile) => {
+    const minutesFromStart = milesPerMinute ? Math.round(mile / milesPerMinute) : null;
+    const etaFromStart = minutesFromStart != null
+      ? new Date(startTime.getTime() + minutesFromStart * 60 * 1000).toISOString()
+      : null;
+
+    return stopPayload('gas', `Gas stop (mile ${mile})`, {
+      distanceFromStartMiles: mile,
+      etaFromStart,
+      detourMinutes: 3,
+      metadata: {},
+    });
+  });
 }
 
 /**
@@ -119,13 +158,8 @@ function buildFallbackTrip(draft, startTime, originName, destName, userType, pre
     metadata: { amenities: ['Restroom', 'Vending'], safeScore: 8, isPetFriendly: true }
   }));
 
-  const gasStops = [1, 2].map((i) => stopPayload('gas', `Shell Station ${i}`, {
-    address: `Exit ${25 + i * 100}`,
-    etaFromStart: baseTime(90 + i * 120),
-    distanceFromStartMiles: 120 + i * 90,
-    detourMinutes: 3,
-    metadata: { fuelPrice: 3.45 + i * 0.1 }
-  }));
+  // Note: no gasStops here anymore — calculateTripWithAI() fills that in with
+  // real math after this function returns, using the actual route distance.
 
   const mealStops = [
     stopPayload('meal', 'IHOP', { address: 'Breakfast stop', etaFromStart: baseTime(120), distanceFromStartMiles: 95, detourMinutes: 5, metadata: { mealType: 'breakfast', rating: 4.2, priceRange: 'Budget' } }),
@@ -163,7 +197,7 @@ function buildFallbackTrip(draft, startTime, originName, destName, userType, pre
     userType,
     route,
     restStops,
-    gasStops,
+    gasStops: [], // placeholder — calculateTripWithAI() overwrites this with real stops
     mealStops,
     hotelStops,
     weather,
