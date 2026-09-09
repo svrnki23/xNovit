@@ -7,6 +7,7 @@ import OpenAI from 'openai';
 import { normalizeTripForSwift } from '../lib/iosTripCodec.js';
 import { newUuid, stopPayload, weatherSegmentPayload } from '../lib/schemas.js';
 import { calculateGasStops } from '../lib/gasCalculator.js';
+import { calculateChargingStops } from '../lib/evCalculator.js';
 
 const openai = process.env.OPENAI_API_KEY
   ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
@@ -36,30 +37,42 @@ export async function calculateTripWithAI(draft) {
   }
   if (!trip) trip = buildFallbackTrip(draft, startTime, originName, destName, userType, prefs, vehicle);
 
-  // Gas stops always come from real math, never from AI or hardcoded data —
-  // regardless of which path built the rest of the trip above.
-  trip.gasStops = buildGasStops(vehicle, trip.route, startTime);
+  // Fuel/charging stops always come from real math, never from AI or hardcoded
+  // data — regardless of which path built the rest of the trip above.
+  trip.gasStops = buildFuelStops(vehicle, trip.route, startTime);
 
   return normalizeTripForSwift(trip, draft);
 }
 
 /**
  * Turn the calculator's mile markers into real stop objects the app can display.
- * Station names are placeholders ("Gas stop (mile X)") until real Places/Mapbox
- * data is wired in — we don't invent fake station names anymore.
+ * Uses gas math for a regular vehicle, or EV charging math when vehicle.isEV is true.
+ * Names are placeholders ("Gas stop (mile X)" / "Charging stop (mile X)") until real
+ * Places/Mapbox data is wired in — we don't invent fake station names anymore.
  */
-function buildGasStops(vehicle, route, startTime) {
-  const stopMiles = calculateGasStops({
-    tankCapacityGallons: vehicle?.tankCapacityGallons,
-    fuelRemainingGallons: vehicle?.fuelRemainingGallons,
-    highwayMPG: vehicle?.highwayMPG,
-    totalDistanceMiles: route?.distanceMiles,
-  });
+function buildFuelStops(vehicle, route, startTime) {
+  const isEV = vehicle?.isEV === true;
+
+  const stopMiles = isEV
+    ? calculateChargingStops({
+        batteryRangeMiles: vehicle?.batteryRangeMiles,
+        currentChargePercent: vehicle?.currentChargePercent,
+        totalDistanceMiles: route?.distanceMiles,
+      })
+    : calculateGasStops({
+        tankCapacityGallons: vehicle?.tankCapacityGallons,
+        fuelRemainingGallons: vehicle?.fuelRemainingGallons,
+        highwayMPG: vehicle?.highwayMPG,
+        totalDistanceMiles: route?.distanceMiles,
+      });
 
   // Rough average speed for this trip, used only to estimate an ETA for each stop.
   const milesPerMinute = route?.distanceMiles && route?.durationMinutes
     ? route.distanceMiles / route.durationMinutes
     : null;
+
+  const stopType = isEV ? 'charging' : 'gas';
+  const stopLabel = isEV ? 'Charging stop' : 'Gas stop';
 
   return stopMiles.map((mile) => {
     const minutesFromStart = milesPerMinute ? Math.round(mile / milesPerMinute) : null;
@@ -67,7 +80,7 @@ function buildGasStops(vehicle, route, startTime) {
       ? new Date(startTime.getTime() + minutesFromStart * 60 * 1000).toISOString()
       : null;
 
-    return stopPayload('gas', `Gas stop (mile ${mile})`, {
+    return stopPayload(stopType, `${stopLabel} (mile ${mile})`, {
       distanceFromStartMiles: mile,
       etaFromStart,
       detourMinutes: 3,
