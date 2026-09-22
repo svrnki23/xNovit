@@ -8,6 +8,7 @@ import { normalizeTripForSwift } from '../lib/iosTripCodec.js';
 import { newUuid, stopPayload, weatherSegmentPayload } from '../lib/schemas.js';
 import { calculateGasStops } from '../lib/gasCalculator.js';
 import { calculateChargingStops } from '../lib/evCalculator.js';
+import { geocode, getRoute } from './mapboxService.js';
 
 const openai = process.env.OPENAI_API_KEY
   ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
@@ -37,11 +38,45 @@ export async function calculateTripWithAI(draft) {
   }
   if (!trip) trip = buildFallbackTrip(draft, startTime, originName, destName, userType, prefs, vehicle);
 
+  // Real route always wins over AI/hardcoded data, if we can get one.
+  // Must happen BEFORE fuel stops below, since those depend on real distance.
+  const realRoute = await buildRealRoute(originName, destName);
+  if (realRoute) {
+    trip.route = {
+      ...trip.route,
+      distanceMiles: realRoute.distanceMiles,
+      durationMinutes: realRoute.durationMinutes,
+    };
+    trip.origin.coordinate = realRoute.originCoordinate;
+    trip.destination.coordinate = realRoute.destinationCoordinate;
+  }
+
   // Fuel/charging stops always come from real math, never from AI or hardcoded
   // data — regardless of which path built the rest of the trip above.
   trip.gasStops = buildFuelStops(vehicle, trip.route, startTime);
 
   return normalizeTripForSwift(trip, draft);
+}
+
+/**
+ * Try to get a real route between two place names.
+ * Returns null (instead of throwing) if geocoding/routing fails for any
+ * reason — the caller then just keeps whatever fake route it already had.
+ */
+async function buildRealRoute(originName, destName) {
+  try {
+    const originCoordinate = await geocode(originName);
+    const destinationCoordinate = await geocode(destName);
+    if (!originCoordinate || !destinationCoordinate) return null;
+
+    const route = await getRoute(originCoordinate, destinationCoordinate);
+    if (!route) return null;
+
+    return { ...route, originCoordinate, destinationCoordinate };
+  } catch (err) {
+    console.warn('Real route lookup failed, keeping existing route:', err.message);
+    return null;
+  }
 }
 
 /**
