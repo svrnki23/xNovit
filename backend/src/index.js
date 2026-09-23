@@ -11,6 +11,7 @@ import { tripsRouter } from './routes/trips.js';
 import { stopsRouter } from './routes/stops.js';
 import { emergencyRouter } from './routes/emergency.js';
 import { rewardsRouter } from './routes/rewards.js';
+import { authRouter } from './routes/auth.js';
 
 const app = express();
 const DEFAULT_PORT = Number(process.env.PORT) || 3000;
@@ -26,6 +27,7 @@ app.use('/api/trips', tripsRouter);
 app.use('/api/stops', stopsRouter);
 app.use('/api/emergency', emergencyRouter);
 app.use('/api/rewards', rewardsRouter);
+app.use('/api/auth', authRouter);
 
 app.use((err, req, res, next) => {
   console.error(err);
