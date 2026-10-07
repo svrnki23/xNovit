@@ -3,27 +3,32 @@ node_modules/
 
 # --- Environment secrets (each person keeps their own, only .env.example is shared) ---
 .env
-.env.local
+.env.*
+!.env.example
 
 # --- Build output / logs ---
 dist/
 build/
+coverage/
 *.log
 
 # --- macOS ---
 .DS_Store
 
-# --- Xcode (for when the iOS app exists) ---
+# --- Old SwiftUI prototype (a separate local repo, replaced by apps/mobile) ---
+/xNovit/
+
+# --- Xcode ---
 xcuserdata/
 DerivedData/
 *.xcworkspace/xcuserdata/
 Pods/
 
-# --- Android / Gradle (for when the Android app exists) ---
+# --- Android / Gradle ---
 .gradle/
 local.properties
 *.iml
 .idea/
 
-# --- Expo / React Native (for when the app project exists) ---
+# --- Expo / React Native ---
 .expo/
