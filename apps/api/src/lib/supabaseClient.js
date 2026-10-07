@@ -10,7 +10,7 @@ const SUPABASE_URL = process.env.SUPABASE_URL;
 // service_role reliably bypasses Row Level Security for our backend.
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-// null if not configured, same pattern as the OpenAI client in aiService.js.
+// null if not configured.
 export const supabase = SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY
   ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
   : null;
