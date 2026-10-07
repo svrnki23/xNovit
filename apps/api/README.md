@@ -1,45 +1,68 @@
-# xNovit Backend API
+# @xnovit/api
 
-Node.js backend for xNovit: **AI-powered trip planning**, nearest rest stops, emergency nearby, and rewards. Connects to the iOS app end-to-end.
+The xNovit HTTP API: Express 5 and TypeScript, run with `tsx`. Every request body is validated with the shared schemas in `@xnovit/core`.
 
-## Features
-
-- **POST /api/trips/calculate** — Calculate full trip from draft (origin, destination, vehicle, preferences). Uses **OpenAI** when `OPENAI_API_KEY` is set; otherwise deterministic fallback.
-- **POST /api/stops/nearest-rest** — "I'm tired" flow: nearest safe rest stops (body: `{ "near": "current" }` or `{ "latitude", "longitude" }`).
-- **POST /api/emergency/nearby** — Emergency: nearest hospitals, tows, police (body: `{ "latitude", "longitude" }`).
-- **GET /api/rewards/balance** — User points balance.
-- **POST /api/rewards/earn** — Credit points (body: `{ "points", "reason" }`).
-- **POST /api/trips** — Save trip (body: full Trip JSON).
-- **GET /api/trips** — List saved trips.
-
-## Setup
+Run it from the repo root:
 
 ```bash
-cd backend
-cp .env.example .env
-# Edit .env: set OPENAI_API_KEY for AI-generated trips and stops (optional)
-npm install
 npm run dev
 ```
 
-Server runs at **http://127.0.0.1:3000** (or `PORT` in `.env`).
+## Endpoints
 
-**Port already in use?** If you see `EADDRINUSE: address already in use :::3000`:
-- Free the port: `lsof -ti:3000 | xargs kill`
-- Or run on another port: `PORT=3001 npm run dev`, then set `XNOVIT_API_BASE=http://127.0.0.1:3001` in your Xcode scheme (Edit Scheme → Run → Arguments → Environment Variables).
+Everything lives under `/api/v1`. An endpoint that isn't built yet validates its input and then answers `501 not_implemented`. It never returns placeholder data.
 
-## iOS connection
+| Method | Path                           | Purpose                                       | Status   |
+| ------ | ------------------------------ | --------------------------------------------- | -------- |
+| `GET`  | `/health`                      | Health check                                  | Live     |
+| `POST` | `/plans`                       | Create a trip and plan v1 from a trip request | 501 → M1 |
+| `POST` | `/plans/departure-options`     | Top 3 departure times with explanations       | 501 → M1 |
+| `GET`  | `/plans/:tripId`               | Latest plan (owner or share token)            | 501 → M3 |
+| `POST` | `/plans/:tripId/replan`        | New plan version and what changed             | 501 → M4 |
+| `POST` | `/plans/:tripId/items/:itemId` | Mark done or skipped, select an option, lock  | 501 → M4 |
+| `POST` | `/plans/:tripId/events`        | Log trip events                               | 501 → M4 |
+| `POST` | `/plans/:tripId/share`         | Create or revoke a share link                 | 501 → M3 |
 
-- The app uses **http://127.0.0.1:3000** by default (simulator).
-- Override with environment variable `XNOVIT_API_BASE` (e.g. in Xcode scheme: `http://192.168.1.x:3000` for a physical device on the same network).
-- Local networking is allowed via `NSAppTransportSecurity_AllowsLocalNetworking` in the iOS target.
+Request body schemas are in [`packages/core/src/api.ts`](../../packages/core/src/api.ts).
 
-## AI (OpenAI)
+## Errors
 
-With `OPENAI_API_KEY` set:
+Every error has the same shape. Validation failures add `issues`:
 
-- **Trip calculation** — GPT-4o-mini generates a full trip plan (rest areas, gas, meals, hotels, weather, fun activities) from origin, destination, and preferences.
-- **Nearest rest** — AI suggests 2–4 safe rest stops near the given location.
-- **Emergency** — AI returns realistic hospital, tow, and police options for the coordinates.
+```json
+{
+  "error": "invalid_request",
+  "message": "The request body is invalid.",
+  "issues": [{ "path": "departAt", "message": "Invalid ISO datetime" }]
+}
+```
 
-Without the key, the backend uses built-in fallback data so the app still works.
+## Configuration
+
+Set these in the environment, or in `apps/api/.env` (copy [`.env.example`](.env.example)). An empty value means "not set", and the API still starts.
+
+| Variable                    | Needed from | Purpose                                                 |
+| --------------------------- | ----------- | ------------------------------------------------------- |
+| `PORT`                      | —           | Port to listen on (default 3000; `0` picks a free port) |
+| `NODE_ENV`                  | —           | `development` (default), `test`, or `production`        |
+| `MAPBOX_TOKEN`              | M1          | Mapbox Directions and Geocoding                         |
+| `SUPABASE_URL`              | M3          | Supabase project URL                                    |
+| `SUPABASE_SERVICE_ROLE_KEY` | M3          | Server-only key. It never goes in the app.              |
+| `BOOKING_AFFILIATE_ID`      | M4          | Added to hotel links when set                           |
+
+## Layout
+
+| Path                            | What it is                                                |
+| ------------------------------- | --------------------------------------------------------- |
+| `src/index.ts`                  | Loads config and starts the server                        |
+| `src/app.ts`                    | `createApp()`: middleware, routes, 404 and error handling |
+| `src/config.ts`                 | Environment loading and validation                        |
+| `src/routes/v1.ts`              | The v1 routes                                             |
+| `src/lib/http.ts`               | `sendError()` and `validateBody()`                        |
+| `src/lib/supabase.ts`           | Server-side Supabase client (used from M3)                |
+| `src/middleware/requireAuth.ts` | Verifies a Supabase access token (used from M3)           |
+| `src/services/mapbox.ts`        | Mapbox geocoding and directions (extended in M1)          |
+
+## Tests
+
+`npm test` from the repo root, or `npm test -w @xnovit/api`. Tests use Supertest against `createApp()` and never touch the network. Outside calls go through an injected `fetch`.

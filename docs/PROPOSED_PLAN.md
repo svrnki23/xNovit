@@ -1,3 +1,5 @@
+> **Superseded on October 7, 2026.** The source of truth is now the build brief, [XNOVIT_BUILD_BRIEF.md](XNOVIT_BUILD_BRIEF.md). This document is kept for history only.
+
 # xNovit — Updated Plan (Blends Old Docs + AI Planning Chat + Our Discussion)
 
 ## Why this document exists
