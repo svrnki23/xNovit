@@ -1,0 +1,12 @@
+node_modules/
+dist/
+coverage/
+package-lock.json
+xNovit/
+
+# Kept verbatim: the build brief and the superseded planning docs.
+docs/XNOVIT_BUILD_BRIEF.md
+docs/PRODUCT_SPECIFICATION.md
+docs/PROPOSED_PLAN.md
+docs/TECH_STACK.md
+docs/WORKFLOWS.md
