@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View, Button, ActivityIndicator, Image } from 'react-native';
+import { StyleSheet, Text, View, Button, ActivityIndicator, Image, TextInput } from 'react-native';
 
 // Our own backend, running locally for now.
 const API_BASE = 'http://localhost:3000';
@@ -26,12 +26,22 @@ function buildMapUrl(origin: Coordinate, destination: Coordinate) {
 }
 
 export default function App() {
+  // What the user has typed so far.
+  const [originName, setOriginName] = useState('');
+  const [destinationName, setDestinationName] = useState('');
+
   const [loading, setLoading] = useState(false);
   const [trip, setTrip] = useState<TripResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Calls the real backend with a hardcoded test trip, same one we tested by hand.
+  // Calls the real backend with whatever the user typed into the two fields.
   async function calculateTrip() {
+    // Don't bother hitting the backend if either field is still empty.
+    if (!originName.trim() || !destinationName.trim()) {
+      setError('Please enter both an origin and a destination.');
+      return;
+    }
+
     setLoading(true);
     setError(null);
     try {
@@ -39,8 +49,8 @@ export default function App() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          origin: { name: 'Chicago, IL' },
-          destination: { name: 'St. Louis, MO' },
+          origin: { name: originName.trim() },
+          destination: { name: destinationName.trim() },
           tripType: 'oneWay',
           leaveNow: true,
           preferences: {},
@@ -66,7 +76,20 @@ export default function App() {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>xNovit</Text>
-      <Text style={styles.subtitle}>Chicago, IL → St. Louis, MO</Text>
+      <Text style={styles.subtitle}>Plan a trip</Text>
+
+      <TextInput
+        style={styles.input}
+        placeholder="Origin (e.g. Chicago, IL)"
+        value={originName}
+        onChangeText={setOriginName}
+      />
+      <TextInput
+        style={styles.input}
+        placeholder="Destination (e.g. St. Louis, MO)"
+        value={destinationName}
+        onChangeText={setDestinationName}
+      />
 
       <Button title="Calculate trip" onPress={calculateTrip} />
 
@@ -81,7 +104,7 @@ export default function App() {
 
       {mapUrl && <Image source={{ uri: mapUrl }} style={styles.map} />}
 
-      {error && <Text style={styles.error}>Error: {error}</Text>}
+      {error && <Text style={styles.error}>{error}</Text>}
 
       <StatusBar style="auto" />
     </View>
@@ -95,9 +118,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 12,
+    padding: 16,
   },
   title: { fontSize: 28, fontWeight: 'bold' },
   subtitle: { fontSize: 14, color: '#666' },
+  input: {
+    width: '100%',
+    maxWidth: 320,
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 8,
+    padding: 10,
+  },
   spacer: { marginTop: 12 },
   result: { marginTop: 16, alignItems: 'center' },
   map: { width: 300, height: 200, marginTop: 16, borderRadius: 8 },
