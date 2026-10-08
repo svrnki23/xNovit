@@ -1,3 +1,5 @@
+> **Superseded on October 7, 2026.** The source of truth is now the build brief, [XNOVIT_BUILD_BRIEF.md](XNOVIT_BUILD_BRIEF.md). This document is kept for history only.
+
 f# xNovit — Structured Workflows
 
 This document details user flows and system workflows. The product spec (`PRODUCT_SPECIFICATION.md`) contains the full feature list and tech stack.

@@ -1,5 +1,9 @@
-# Normalize line endings across Windows and Mac so Git doesn't treat
-# line-ending differences as real code changes. Git stores text files
-# in the shared repo using LF, and converts them to each person's
-# native format (CRLF on Windows, LF on Mac) when checked out locally.
-* text=auto
+# Check out every text file with LF line endings, on Windows and Mac alike.
+# Git still stores LF in the repo. Plain `text=auto` would give Windows
+# checkouts CRLF, which makes `npm run format:check` fail there; every
+# editor we use handles LF fine.
+* text=auto eol=lf
+
+# Windows-only scripts must keep CRLF.
+*.cmd text eol=crlf
+*.bat text eol=crlf

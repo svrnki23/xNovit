@@ -1,3 +1,5 @@
+> **Superseded on October 7, 2026.** The source of truth is now the build brief, [XNOVIT_BUILD_BRIEF.md](XNOVIT_BUILD_BRIEF.md). This document is kept for history only.
+
 # xNovit — iOS Mobile Full-Stack Tech Stack
 
 Quick reference for building the xNovit iOS app and backend. Full product context is in `PRODUCT_SPECIFICATION.md`.
