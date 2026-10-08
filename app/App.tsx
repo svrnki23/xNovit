@@ -26,13 +26,71 @@ function buildMapUrl(origin: Coordinate, destination: Coordinate) {
 }
 
 export default function App() {
-  // What the user has typed so far.
+  // --- Login state ---
+  // What the user types into the email/password boxes.
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  // Set once login succeeds. While this is empty, the user isn't logged in.
+  const [accessToken, setAccessToken] = useState('');
+  const [loggedInEmail, setLoggedInEmail] = useState('');
+  const [authLoading, setAuthLoading] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
+
+  // --- Trip planner state ---
   const [originName, setOriginName] = useState('');
   const [destinationName, setDestinationName] = useState('');
-
   const [loading, setLoading] = useState(false);
   const [trip, setTrip] = useState<TripResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Creates a brand new account. Supabase sends a confirmation email — the
+  // account can't log in until that email is confirmed.
+  async function signUp() {
+    setAuthLoading(true);
+    setAuthError(null);
+    try {
+      const response = await fetch(`${API_BASE}/api/auth/signup`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Sign up failed');
+      setAuthError('Account created — check your email to confirm it, then log in.');
+    } catch (err) {
+      setAuthError(err instanceof Error ? err.message : 'Something went wrong');
+    } finally {
+      setAuthLoading(false);
+    }
+  }
+
+  // Logs in with an existing (and confirmed) account, and saves the token
+  // that proves who's logged in for later use.
+  async function logIn() {
+    setAuthLoading(true);
+    setAuthError(null);
+    try {
+      const response = await fetch(`${API_BASE}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Log in failed');
+      setAccessToken(data.session.access_token);
+      setLoggedInEmail(data.user.email);
+    } catch (err) {
+      setAuthError(err instanceof Error ? err.message : 'Something went wrong');
+    } finally {
+      setAuthLoading(false);
+    }
+  }
+
+  // Just clears what's stored on this screen — nothing to tell the server.
+  function logOut() {
+    setAccessToken('');
+    setLoggedInEmail('');
+  }
 
   // Calls the real backend with whatever the user typed into the two fields.
   async function calculateTrip() {
@@ -73,10 +131,48 @@ export default function App() {
     ? buildMapUrl(trip.origin.coordinate, trip.destination.coordinate)
     : null;
 
+  // Not logged in yet — show the sign up / log in form, and stop here.
+  // (The trip planner below only appears once accessToken is set.)
+  if (!accessToken) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.title}>xNovit</Text>
+        <Text style={styles.subtitle}>Log in or create an account</Text>
+
+        <TextInput
+          style={styles.input}
+          placeholder="Email"
+          value={email}
+          onChangeText={setEmail}
+          autoCapitalize="none"
+        />
+        <TextInput
+          style={styles.input}
+          placeholder="Password"
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry
+        />
+
+        <View style={styles.buttonRow}>
+          <Button title="Sign up" onPress={signUp} />
+          <Button title="Log in" onPress={logIn} />
+        </View>
+
+        {authLoading && <ActivityIndicator style={styles.spacer} />}
+        {authError && <Text style={styles.error}>{authError}</Text>}
+
+        <StatusBar style="auto" />
+      </View>
+    );
+  }
+
+  // Logged in — show who's logged in, a way to log out, and the trip planner.
   return (
     <View style={styles.container}>
       <Text style={styles.title}>xNovit</Text>
-      <Text style={styles.subtitle}>Plan a trip</Text>
+      <Text style={styles.subtitle}>Logged in as {loggedInEmail}</Text>
+      <Button title="Log out" onPress={logOut} />
 
       <TextInput
         style={styles.input}
@@ -130,8 +226,9 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 10,
   },
+  buttonRow: { flexDirection: 'row', gap: 12 },
   spacer: { marginTop: 12 },
   result: { marginTop: 16, alignItems: 'center' },
   map: { width: 300, height: 200, marginTop: 16, borderRadius: 8 },
-  error: { marginTop: 16, color: 'red' },
+  error: { marginTop: 16, color: 'red', textAlign: 'center' },
 });

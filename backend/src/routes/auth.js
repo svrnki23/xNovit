@@ -27,6 +27,14 @@ authRouter.post('/signup', async (req, res) => {
       return res.status(400).json({ error: error.message });
     }
 
+    // Supabase quietly "succeeds" instead of erroring when the email is
+    // already registered (done on purpose, so signup can't be used to find
+    // out which emails have accounts). The tell: identities comes back
+    // empty instead of containing the new account.
+    if (data.user && data.user.identities && data.user.identities.length === 0) {
+      return res.status(409).json({ error: 'Account already exists' });
+    }
+
     res.status(201).json({ user: data.user });
   } catch (err) {
     console.error('POST /api/auth/signup', err);
