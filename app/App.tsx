@@ -34,6 +34,7 @@ export default function App() {
   // Set once login succeeds. While this is empty, the user isn't logged in.
   const [accessToken, setAccessToken] = useState('');
   const [loggedInEmail, setLoggedInEmail] = useState('');
+  const [pointsBalance, setPointsBalance] = useState<number | null>(null);
   const [authLoading, setAuthLoading] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
 
@@ -91,6 +92,8 @@ export default function App() {
       if (!response.ok) throw new Error(data.error || 'Log in failed');
       setAccessToken(data.session.access_token);
       setLoggedInEmail(data.user.email);
+      // Pass the token directly — accessToken state hasn't updated yet at this point.
+      loadRewardsBalance(data.session.access_token);
     } catch (err) {
       setAuthError(err instanceof Error ? err.message : 'Something went wrong');
     } finally {
@@ -98,10 +101,25 @@ export default function App() {
     }
   }
 
+  // Fetches the logged-in user's reward points. Not critical if it fails —
+  // the screen just won't show a balance, nothing else depends on it.
+  async function loadRewardsBalance(token: string) {
+    try {
+      const response = await fetch(`${API_BASE}/api/rewards/balance`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await response.json();
+      if (response.ok) setPointsBalance(data.pointsBalance);
+    } catch {
+      // Ignore — see comment above.
+    }
+  }
+
   // Just clears what's stored on this screen — nothing to tell the server.
   function logOut() {
     setAccessToken('');
     setLoggedInEmail('');
+    setPointsBalance(null);
   }
 
   // Calls the real backend with whatever the user typed into the two fields.
@@ -231,6 +249,9 @@ export default function App() {
     <View style={styles.container}>
       <Text style={styles.title}>xNovit</Text>
       <Text style={styles.subtitle}>Logged in as {loggedInEmail}</Text>
+      {pointsBalance !== null && (
+        <Text style={styles.subtitle}>⭐ {pointsBalance} points</Text>
+      )}
       <View style={styles.buttonRow}>
         <Button title="Log out" onPress={logOut} />
         <Button title="My Trips" onPress={loadMyTrips} />
