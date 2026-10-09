@@ -42,6 +42,10 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [trip, setTrip] = useState<TripResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Separate loading/message state for saving, so it doesn't mix up with
+  // the "calculating a trip" state above.
+  const [saving, setSaving] = useState(false);
+  const [saveMessage, setSaveMessage] = useState<string | null>(null);
 
   // Creates a brand new account. Supabase sends a confirmation email — the
   // account can't log in until that email is confirmed.
@@ -126,6 +130,33 @@ export default function App() {
     }
   }
 
+  // Saves the currently-calculated trip to the logged-in user's account.
+  // Needs the Authorization header, since the backend requires login here —
+  // unlike calculateTrip() above, which anyone can call.
+  async function saveTrip() {
+    if (!trip) return;
+
+    setSaving(true);
+    setSaveMessage(null);
+    try {
+      const response = await fetch(`${API_BASE}/api/trips`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify(trip),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Failed to save trip');
+      setSaveMessage('Trip saved!');
+    } catch (err) {
+      setSaveMessage(err instanceof Error ? err.message : 'Something went wrong');
+    } finally {
+      setSaving(false);
+    }
+  }
+
   // Only build a map once we actually have real coordinates to put on it.
   const mapUrl = trip?.origin.coordinate && trip?.destination.coordinate
     ? buildMapUrl(trip.origin.coordinate, trip.destination.coordinate)
@@ -200,6 +231,11 @@ export default function App() {
 
       {mapUrl && <Image source={{ uri: mapUrl }} style={styles.map} />}
 
+      {/* Only show "Save trip" once there's an actual trip to save. */}
+      {trip && <Button title="Save trip" onPress={saveTrip} />}
+      {saving && <ActivityIndicator style={styles.spacer} />}
+      {saveMessage && <Text style={styles.saveMessage}>{saveMessage}</Text>}
+
       {error && <Text style={styles.error}>{error}</Text>}
 
       <StatusBar style="auto" />
@@ -231,4 +267,5 @@ const styles = StyleSheet.create({
   result: { marginTop: 16, alignItems: 'center' },
   map: { width: 300, height: 200, marginTop: 16, borderRadius: 8 },
   error: { marginTop: 16, color: 'red', textAlign: 'center' },
+  saveMessage: { marginTop: 8, color: '#1a7a1a', textAlign: 'center' },
 });
