@@ -12,9 +12,10 @@ type Coordinate = { latitude: number; longitude: number };
 
 // Just the fields we actually use on screen — the real response has a lot more.
 type TripResult = {
+  id: string;
   route: { distanceMiles: number; durationMinutes: number };
-  origin: { coordinate: Coordinate | null };
-  destination: { coordinate: Coordinate | null };
+  origin: { name: string; coordinate: Coordinate | null };
+  destination: { name: string; coordinate: Coordinate | null };
 };
 
 // Builds a plain map picture with two pins on it, via Mapbox's Static Images API.
@@ -46,6 +47,13 @@ export default function App() {
   // the "calculating a trip" state above.
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
+
+  // --- My Trips view state ---
+  // Which section to show once logged in: the planner, or the saved-trips list.
+  const [view, setView] = useState<'plan' | 'myTrips'>('plan');
+  const [savedTrips, setSavedTrips] = useState<TripResult[] | null>(null);
+  const [tripsLoading, setTripsLoading] = useState(false);
+  const [tripsError, setTripsError] = useState<string | null>(null);
 
   // Creates a brand new account. Supabase sends a confirmation email — the
   // account can't log in until that email is confirmed.
@@ -157,6 +165,25 @@ export default function App() {
     }
   }
 
+  // Fetches this user's own saved trips. Same auth pattern as saveTrip().
+  async function loadMyTrips() {
+    setView('myTrips');
+    setTripsLoading(true);
+    setTripsError(null);
+    try {
+      const response = await fetch(`${API_BASE}/api/trips`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Failed to load trips');
+      setSavedTrips(data);
+    } catch (err) {
+      setTripsError(err instanceof Error ? err.message : 'Something went wrong');
+    } finally {
+      setTripsLoading(false);
+    }
+  }
+
   // Only build a map once we actually have real coordinates to put on it.
   const mapUrl = trip?.origin.coordinate && trip?.destination.coordinate
     ? buildMapUrl(trip.origin.coordinate, trip.destination.coordinate)
@@ -198,45 +225,68 @@ export default function App() {
     );
   }
 
-  // Logged in — show who's logged in, a way to log out, and the trip planner.
+  // Logged in — show who's logged in, a way to log out, and either the
+  // trip planner or the "My Trips" list, depending on `view`.
   return (
     <View style={styles.container}>
       <Text style={styles.title}>xNovit</Text>
       <Text style={styles.subtitle}>Logged in as {loggedInEmail}</Text>
-      <Button title="Log out" onPress={logOut} />
+      <View style={styles.buttonRow}>
+        <Button title="Log out" onPress={logOut} />
+        <Button title="My Trips" onPress={loadMyTrips} />
+      </View>
 
-      <TextInput
-        style={styles.input}
-        placeholder="Origin (e.g. Chicago, IL)"
-        value={originName}
-        onChangeText={setOriginName}
-      />
-      <TextInput
-        style={styles.input}
-        placeholder="Destination (e.g. St. Louis, MO)"
-        value={destinationName}
-        onChangeText={setDestinationName}
-      />
-
-      <Button title="Calculate trip" onPress={calculateTrip} />
-
-      {loading && <ActivityIndicator style={styles.spacer} />}
-
-      {trip && (
+      {view === 'myTrips' ? (
         <View style={styles.result}>
-          <Text>Distance: {trip.route.distanceMiles} miles</Text>
-          <Text>Duration: {trip.route.durationMinutes} minutes</Text>
+          <Button title="Back to planner" onPress={() => setView('plan')} />
+
+          {tripsLoading && <ActivityIndicator style={styles.spacer} />}
+          {tripsError && <Text style={styles.error}>{tripsError}</Text>}
+
+          {savedTrips?.length === 0 && <Text>No saved trips yet.</Text>}
+
+          {savedTrips?.map((savedTrip) => (
+            <Text key={savedTrip.id} style={styles.tripRow}>
+              {savedTrip.origin.name} → {savedTrip.destination.name} — {savedTrip.route.distanceMiles} mi
+            </Text>
+          ))}
         </View>
+      ) : (
+        <>
+          <TextInput
+            style={styles.input}
+            placeholder="Origin (e.g. Chicago, IL)"
+            value={originName}
+            onChangeText={setOriginName}
+          />
+          <TextInput
+            style={styles.input}
+            placeholder="Destination (e.g. St. Louis, MO)"
+            value={destinationName}
+            onChangeText={setDestinationName}
+          />
+
+          <Button title="Calculate trip" onPress={calculateTrip} />
+
+          {loading && <ActivityIndicator style={styles.spacer} />}
+
+          {trip && (
+            <View style={styles.result}>
+              <Text>Distance: {trip.route.distanceMiles} miles</Text>
+              <Text>Duration: {trip.route.durationMinutes} minutes</Text>
+            </View>
+          )}
+
+          {mapUrl && <Image source={{ uri: mapUrl }} style={styles.map} />}
+
+          {/* Only show "Save trip" once there's an actual trip to save. */}
+          {trip && <Button title="Save trip" onPress={saveTrip} />}
+          {saving && <ActivityIndicator style={styles.spacer} />}
+          {saveMessage && <Text style={styles.saveMessage}>{saveMessage}</Text>}
+
+          {error && <Text style={styles.error}>{error}</Text>}
+        </>
       )}
-
-      {mapUrl && <Image source={{ uri: mapUrl }} style={styles.map} />}
-
-      {/* Only show "Save trip" once there's an actual trip to save. */}
-      {trip && <Button title="Save trip" onPress={saveTrip} />}
-      {saving && <ActivityIndicator style={styles.spacer} />}
-      {saveMessage && <Text style={styles.saveMessage}>{saveMessage}</Text>}
-
-      {error && <Text style={styles.error}>{error}</Text>}
 
       <StatusBar style="auto" />
     </View>
@@ -268,4 +318,5 @@ const styles = StyleSheet.create({
   map: { width: 300, height: 200, marginTop: 16, borderRadius: 8 },
   error: { marginTop: 16, color: 'red', textAlign: 'center' },
   saveMessage: { marginTop: 8, color: '#1a7a1a', textAlign: 'center' },
+  tripRow: { marginTop: 8, textAlign: 'center' },
 });
