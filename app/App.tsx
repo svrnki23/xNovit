@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View, Button, ActivityIndicator, Image, TextInput } from 'react-native';
+import { StyleSheet, Text, View, Button, ActivityIndicator, Image, TextInput, ScrollView } from 'react-native';
 
 // Our own backend, running locally for now.
 const API_BASE = 'http://localhost:3000';
@@ -10,12 +10,31 @@ const MAPBOX_TOKEN = process.env.EXPO_PUBLIC_MAPBOX_TOKEN;
 
 type Coordinate = { latitude: number; longitude: number };
 
+// A gas/EV, rest area, or meal stop — they all share this same basic shape.
+type Stop = {
+  id: string;
+  name: string;
+  distanceFromStartMiles: number | null;
+};
+
+type WeatherSegment = {
+  id: string;
+  startMile: number;
+  endMile: number;
+  condition: string;
+  severity: string | null;
+};
+
 // Just the fields we actually use on screen — the real response has a lot more.
 type TripResult = {
   id: string;
   route: { distanceMiles: number; durationMinutes: number };
   origin: { name: string; coordinate: Coordinate | null };
   destination: { name: string; coordinate: Coordinate | null };
+  gasStops: Stop[];
+  restStops: Stop[];
+  mealStops: Stop[];
+  weather: WeatherSegment[];
 };
 
 // Builds a plain map picture with two pins on it, via Mapbox's Static Images API.
@@ -24,6 +43,40 @@ function buildMapUrl(origin: Coordinate, destination: Coordinate) {
   const originPin = `pin-s-a+285A98(${origin.longitude},${origin.latitude})`;
   const destPin = `pin-s-b+285A98(${destination.longitude},${destination.latitude})`;
   return `https://api.mapbox.com/styles/v1/mapbox/streets-v12/static/${originPin},${destPin}/auto/600x400@2x?access_token=${MAPBOX_TOKEN}`;
+}
+
+// Shows one labeled list of stops (gas, rest areas, or meals) — reused three
+// times below instead of repeating the same list-rendering code each time.
+// Renders nothing at all if there's nothing to show.
+function StopSection({ title, stops }: { title: string; stops: Stop[] }) {
+  if (!stops || stops.length === 0) return null;
+  return (
+    <View style={styles.section}>
+      <Text style={styles.sectionTitle}>{title}</Text>
+      {stops.map((stop) => (
+        <Text key={stop.id} style={styles.stopRow}>
+          {stop.name}
+          {stop.distanceFromStartMiles != null ? ` — mile ${stop.distanceFromStartMiles}` : ''}
+        </Text>
+      ))}
+    </View>
+  );
+}
+
+// Shows the weather forecast broken into mile ranges along the route.
+function WeatherSection({ segments }: { segments: WeatherSegment[] }) {
+  if (!segments || segments.length === 0) return null;
+  return (
+    <View style={styles.section}>
+      <Text style={styles.sectionTitle}>Weather</Text>
+      {segments.map((segment) => (
+        <Text key={segment.id} style={styles.stopRow}>
+          Mile {segment.startMile}–{segment.endMile}: {segment.condition}
+          {segment.severity ? ` (${segment.severity})` : ''}
+        </Text>
+      ))}
+    </View>
+  );
 }
 
 export default function App() {
@@ -273,7 +326,9 @@ export default function App() {
           ))}
         </View>
       ) : (
-        <>
+        // Scrollable, since a full trip breakdown (stops + weather) can
+        // easily run taller than the screen.
+        <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
           <TextInput
             style={styles.input}
             placeholder="Origin (e.g. Chicago, IL)"
@@ -300,13 +355,22 @@ export default function App() {
 
           {mapUrl && <Image source={{ uri: mapUrl }} style={styles.map} />}
 
+          {trip && (
+            <>
+              <StopSection title="Gas / Charging Stops" stops={trip.gasStops} />
+              <StopSection title="Rest Areas" stops={trip.restStops} />
+              <StopSection title="Meal Stops" stops={trip.mealStops} />
+              <WeatherSection segments={trip.weather} />
+            </>
+          )}
+
           {/* Only show "Save trip" once there's an actual trip to save. */}
           {trip && <Button title="Save trip" onPress={saveTrip} />}
           {saving && <ActivityIndicator style={styles.spacer} />}
           {saveMessage && <Text style={styles.saveMessage}>{saveMessage}</Text>}
 
           {error && <Text style={styles.error}>{error}</Text>}
-        </>
+        </ScrollView>
       )}
 
       <StatusBar style="auto" />
@@ -340,4 +404,9 @@ const styles = StyleSheet.create({
   error: { marginTop: 16, color: 'red', textAlign: 'center' },
   saveMessage: { marginTop: 8, color: '#1a7a1a', textAlign: 'center' },
   tripRow: { marginTop: 8, textAlign: 'center' },
+  scroll: { width: '100%' },
+  scrollContent: { alignItems: 'center', gap: 12, paddingBottom: 24 },
+  section: { width: '100%', maxWidth: 320, marginTop: 16 },
+  sectionTitle: { fontWeight: 'bold', marginBottom: 4 },
+  stopRow: { marginTop: 2 },
 });
