@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "start": "node src/index.js",
-    "dev": "NODE_OPTIONS=--disable-warning=DEP0040 node --watch src/index.js"
+    "dev": "node --watch src/index.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.117.0",
