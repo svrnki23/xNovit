@@ -8,8 +8,8 @@ Node.js backend for xNovit: **AI-powered trip planning**, nearest rest stops, em
 - **POST /api/stops/nearest-rest** — "I'm tired" flow: nearest safe rest stops (body: `{ "near": "current" }` or `{ "latitude", "longitude" }`).
 - **POST /api/emergency/nearby** — Emergency: nearest hospitals, tows, police (body: `{ "latitude", "longitude" }`).
 - **GET /api/rewards/balance** — User points balance.
-- **POST /api/rewards/earn** — Credit points (body: `{ "points", "reason" }`).
-- **POST /api/trips** — Save trip (body: full Trip JSON).
+- **POST /api/rewards/redeem** — Spend points (body: `{ "points", "type" }`).
+- **POST /api/trips** — Save trip (body: full Trip JSON). Also awards points automatically — there's no separate "earn points" endpoint, by design (see `rewards.js`).
 - **GET /api/trips** — List saved trips.
 
 ## Setup

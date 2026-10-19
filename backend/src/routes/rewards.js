@@ -51,27 +51,11 @@ rewardsRouter.get('/balance', requireAuth, async (req, res) => {
   }
 });
 
-/**
- * POST /api/rewards/earn
- * Body: { points: number, reason: string }
- */
-rewardsRouter.post('/earn', requireAuth, async (req, res) => {
-  try {
-    const points = Number(req.body?.points);
-    if (!Number.isFinite(points) || points < 0) {
-      return res.status(400).json({ error: 'points must be a non-negative number' });
-    }
-
-    const current = await getOrCreateBalance(req.user.id);
-    const pointsBalance = current + points;
-    await setBalance(req.user.id, pointsBalance);
-
-    res.json({ pointsBalance });
-  } catch (err) {
-    console.error('POST /api/rewards/earn', err);
-    res.status(500).json({ error: 'Failed to earn points' });
-  }
-});
+// Note: there is deliberately no public "POST /earn" route anymore. Letting
+// any logged-in user add any amount of points for any reason was an open
+// exploit. Points are now only ever awarded by the server itself — see
+// trips.js, which calls getOrCreateBalance()/setBalance() directly after a
+// trip is saved, with a fixed amount the user never controls.
 
 /**
  * POST /api/rewards/redeem
