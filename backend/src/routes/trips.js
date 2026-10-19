@@ -8,8 +8,13 @@ import { calculateTripWithAI } from '../services/aiService.js';
 import { newUuid } from '../lib/schemas.js';
 import { supabase } from '../lib/supabaseClient.js';
 import { requireAuth } from '../middleware/requireAuth.js';
+import { getOrCreateBalance, setBalance } from './rewards.js';
 
 export const tripsRouter = Router();
+
+// Fixed reward for saving a trip. Simple for now — a smarter version (e.g.
+// bonus points for eco-friendly routes) can replace this later.
+const POINTS_PER_SAVED_TRIP = 10;
 
 /**
  * POST /api/trips/calculate
@@ -46,7 +51,14 @@ tripsRouter.post('/', requireAuth, async (req, res) => {
       .insert({ id, user_id: req.user.id, trip_data: { ...trip, id } });
     if (error) throw error;
 
-    res.status(201).json({ id });
+    // Reward the user for saving a trip. Done here (server-side), not left
+    // up to the app to ask for — that way the amount and the reason for it
+    // are always controlled by us, not something a client could fake.
+    const currentPoints = await getOrCreateBalance(req.user.id);
+    const pointsBalance = currentPoints + POINTS_PER_SAVED_TRIP;
+    await setBalance(req.user.id, pointsBalance);
+
+    res.status(201).json({ id, pointsEarned: POINTS_PER_SAVED_TRIP, pointsBalance });
   } catch (err) {
     console.error('POST /api/trips', err);
     res.status(500).json({ error: 'Failed to save trip' });

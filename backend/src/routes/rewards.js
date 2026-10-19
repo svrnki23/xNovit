@@ -9,8 +9,11 @@ import { requireAuth } from '../middleware/requireAuth.js';
 
 export const rewardsRouter = Router();
 
+// Exported so other routes (like trips.js) can award points using the exact
+// same logic, instead of copy-pasting it.
+
 // Get this user's points, creating their row (starting at 0) if it doesn't exist yet.
-async function getOrCreateBalance(userId) {
+export async function getOrCreateBalance(userId) {
   const { data, error } = await supabase
     .from('rewards')
     .select('points_balance')
@@ -26,7 +29,7 @@ async function getOrCreateBalance(userId) {
   return 0;
 }
 
-async function setBalance(userId, pointsBalance) {
+export async function setBalance(userId, pointsBalance) {
   const { error } = await supabase
     .from('rewards')
     .update({ points_balance: pointsBalance, updated_at: new Date().toISOString() })

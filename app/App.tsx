@@ -228,7 +228,10 @@ export default function App() {
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Failed to save trip');
-      setSaveMessage('Trip saved!');
+      // The save response now includes what was earned and the new total —
+      // use it directly instead of making a separate balance request.
+      setSaveMessage(`Trip saved! +${data.pointsEarned} points`);
+      setPointsBalance(data.pointsBalance);
     } catch (err) {
       setSaveMessage(err instanceof Error ? err.message : 'Something went wrong');
     } finally {
